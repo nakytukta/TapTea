@@ -179,7 +179,7 @@ export default function ClickToTxDApp() {
               <p className="mt-2 text-sm text-green-400">
                 TX Hash:{" "}
                 <a
-                  href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                  href={`https://sepolia.tea.xyz/tx/${txHash}`}
                   target="_blank"
                   className="underline"
                   rel="noreferrer"
