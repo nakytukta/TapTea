@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion"; // For animations
-import { toast, Toaster } from "react-hot-toast"; // For notifications
-import { FaWallet, FaFaucet, FaNetworkWired } from "react-icons/fa"; // Icons
 
 const contractABI = [
   {
@@ -31,7 +29,7 @@ const contractABI = [
 const contractAddress = "0x01D5a11742b5e819a5517A078d8ce4d9B1c06ac2";
 const RPC = "https://tea-sepolia.g.alchemy.com/public";
 
-export default function ClickToTxDApp() {
+export default function TapTeaDApp() {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [walletAddress, setWalletAddress] = useState(null);
@@ -39,15 +37,16 @@ export default function ClickToTxDApp() {
   const [txHash, setTxHash] = useState(null);
   const [claimCount, setClaimCount] = useState(0);
 
-  // Initialize provider and fetch claim count
+  // Connect to Metamask
   useEffect(() => {
-    if (typeof window !== "undefined" && window.ethereum) {
+    if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
       const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
       setProvider(web3Provider);
     }
     fetchClaimCountToday();
   }, []);
 
+  // Get 7 AM Bangkok timestamp
   const getStartOfDayTimestamp = () => {
     const now = new Date();
     const bangkok = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
@@ -55,6 +54,7 @@ export default function ClickToTxDApp() {
     return Math.floor(bangkok.getTime() / 1000);
   };
 
+  // Fetch today's claim count
   const fetchClaimCountToday = async () => {
     try {
       const rpcProvider = new ethers.providers.JsonRpcProvider(RPC);
@@ -75,47 +75,29 @@ export default function ClickToTxDApp() {
       }
 
       const logs = await contract.queryFilter("Claimed", fromBlock, "latest");
-      const uniqueAddresses = new Set(logs.map((log) => log.args.user.toLowerCase()));
+      const uniqueAddresses = new Set();
+      logs.forEach((log) => uniqueAddresses.add(log.args.user.toLowerCase()));
       setClaimCount(uniqueAddresses.size);
     } catch (err) {
       console.error("Error fetching claim count:", err);
-      toast.error("Failed to fetch claim count");
     }
   };
 
+  // Connect wallet
   const connectWallet = async () => {
     try {
-      if (!provider) {
-        toast.error("No wallet detected. Please install MetaMask.");
-        return;
-      }
-
+      if (!provider) return;
       await provider.send("eth_requestAccounts", []);
       const signer = provider.getSigner();
       const address = await signer.getAddress();
       setSigner(signer);
       setWalletAddress(address);
-      toast.success("Wallet connected!");
-
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x27EA" }],
-        });
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          await addTeaSepoliaNetwork();
-        } else {
-          toast.error("Failed to switch chain");
-          console.error("Switch chain error:", switchError);
-        }
-      }
     } catch (err) {
-      toast.error("Wallet connection failed");
       console.error("Wallet connection error:", err);
     }
   };
 
+  // Add Tea Sepolia network
   const addTeaSepoliaNetwork = async () => {
     try {
       await window.ethereum.request({
@@ -134,28 +116,22 @@ export default function ClickToTxDApp() {
           },
         ],
       });
-      toast.success("Tea Sepolia added to MetaMask!");
     } catch (err) {
-      toast.error("Failed to add Tea Sepolia network");
-      console.error("Error adding Tea Sepolia:", err);
+      console.error("Error adding Tea Sepolia Testnet:", err);
     }
   };
 
+  // Handle claim transaction
   const handleClickTx = async () => {
-    if (!signer) {
-      toast.error("Please connect your wallet first");
-      return;
-    }
+    if (!signer) return;
     setIsLoading(true);
     try {
       const contract = new ethers.Contract(contractAddress, contractABI, signer);
       const tx = await contract.claim();
       await tx.wait();
       setTxHash(tx.hash);
-      toast.success("Claim successful!");
       fetchClaimCountToday();
     } catch (err) {
-      toast.error("Transaction failed");
       console.error("Transaction error:", err);
     } finally {
       setIsLoading(false);
@@ -163,142 +139,139 @@ export default function ClickToTxDApp() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col items-center justify-center p-6 font-sans">
-      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
-
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-blue-950 flex flex-col items-center justify-center p-6 font-sans">
       {/* Header Section */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.8 }}
         className="text-center mb-8"
       >
-        <h1 className="text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
+        <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">
           Tap Tea
         </h1>
-        <p className="mt-2 text-gray-300 text-lg">Claim your daily TEA on the Sepolia Testnet!</p>
+        <p className="text-lg text-blue-300 mt-2">Claim your daily TEA on the Sepolia Testnet</p>
       </motion.div>
 
       {/* Wallet Info */}
       <AnimatePresence>
         {walletAddress && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="mb-6 bg-gray-800 bg-opacity-50 p-4 rounded-xl shadow-lg"
-          >
-            <p className="text-green-300 text-sm flex items-center gap-2">
-              <FaWallet /> Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Interaction */}
-      <motion.div
-        className="flex flex-col items-center space-y-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-      >
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className={`relative ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
-        >
-          <Image
-            src="/tealogo.jpg"
-            alt="Tap Logo"
-            width={200}
-            height={200}
-            className="rounded-full shadow-2xl border-4 border-cyan-500"
-            onClick={handleClickTx}
-          />
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-        </motion.div>
-
-        {txHash && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-sm text-green-400"
+            exit={{ opacity: 0 }}
+            className="text-green-300 text-sm mb-4 bg-gray-800 px-4 py-2 rounded-full"
           >
-            TX Hash:{" "}
-            <a
-              href={`https://sepolia.tea.xyz/tx/${txHash}`}
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-green-300"
-            >
-              {txHash.slice(0, 6)}...{txHash.slice(-4)}
-            </a>
+            Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
           </motion.p>
         )}
+      </AnimatePresence>
 
-        {!walletAddress ? (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={connectWallet}
-            className="bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold text-lg px-8 py-4 rounded-xl shadow-lg flex items-center gap-2"
-          >
-            <FaWallet /> Connect Wallet
-          </motion.button>
+      {/* Main Action Button */}
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="flex flex-col items-center space-y-6"
+      >
+        {walletAddress ? (
+          <>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleClickTx}
+              className="w-64 h-64 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full text-white text-3xl font-bold shadow-2xl flex items-center justify-center relative overflow-hidden"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <svg
+                  className="animate-spin h-8 w-8 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8z"
+                  ></path>
+                </svg>
+              ) : (
+                "TAP"
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white opacity-20 animate-pulse"></div>
+            </motion.button>
+            <AnimatePresence>
+              {txHash && (
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-sm text-green-400"
+                >
+                  TX Hash:{" "}
+                  <a
+                    href={`https://sepolia.tea.xyz/tx/${txHash}`}
+                    target="_blank"
+                    className="underline hover:text-green-300"
+                    rel="noreferrer"
+                  >
+                    {txHash.slice(0, 6)}...{txHash.slice(-4)}
+                  </a>
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </>
         ) : (
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={handleClickTx}
-            disabled={isLoading}
-            className={`bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-lg px-8 py-4 rounded-xl shadow-lg flex items-center gap-2 ${
-              isLoading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            onClick={connectWallet}
+            className="bg-green-500 text-black font-semibold text-lg px-10 py-4 rounded-xl shadow-lg shadow-green-500/50 hover:bg-green-400 transition-all"
           >
-            {isLoading ? "Claiming..." : "Claim TEA"}
+            Connect Wallet
           </motion.button>
         )}
       </motion.div>
 
-      {/* Footer Actions */}
+      {/* Footer Buttons */}
       <motion.div
-        className="fixed bottom-6 left-0 right-0 flex justify-center gap-4"
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.4, duration: 0.6 }}
+        className="fixed bottom-6 flex justify-center w-full gap-4"
       >
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={addTeaSepoliaNetwork}
-          className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-black text-sm px-4 py-2 rounded-xl shadow-md flex items-center gap-2"
+          className="bg-yellow-500 text-black text-sm px-6 py-3 rounded-xl hover:bg-yellow-400 shadow-md transition-all"
         >
-          <FaNetworkWired /> Add Tea Sepolia
-        </motion.button>
-        <motion.a
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          Add Tea Sepolia
+        </button>
+        <a
           href="https://faucet-sepolia.tea.xyz/"
           target="_blank"
           rel="noopener noreferrer"
-          className="bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm px-4 py-2 rounded-xl shadow-md flex items-center gap-2"
+          className="bg-purple-600 text-white text-sm px-6 py-3 rounded-xl hover:bg-purple-500 shadow-md transition-all"
         >
-          <FaFaucet /> Get TEA
-        </motion.a>
+          Get TEA
+        </a>
       </motion.div>
 
-      {/* Claim Count */}
+      {/* Claim Counter */}
       <motion.div
-        className="fixed bottom-6 right-6 bg-gray-800 bg-opacity-70 text-white text-xs px-4 py-2 rounded-full shadow-lg"
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.6 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed bottom-6 right-6 text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2 rounded-full shadow-lg"
       >
-        Today&apos;s Claims: <span className="font-bold text-cyan-400">{claimCount}</span>
+        Today&apos;s Claims: <span className="font-bold">{claimCount}</span>
       </motion.div>
     </div>
   );
