@@ -146,7 +146,7 @@ export default function ClickToTxDApp() {
       )}
 
       <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-lg">
-        Dapp Tea Protocol
+        Tap Tea
       </h1>
 
       <div className="flex flex-col items-center space-y-4 mt-6">
