@@ -165,19 +165,16 @@ export default function ClickToTxDApp() {
         Tap Tea
       </h1>
 
-      <div className="flex flex-col items-center space-y-4 mt-6">
-        {walletAddress ? (
-          <>
-            <Image
-              src="https://pbs.twimg.com/profile_images/1708838507957882880/SsQYN3T6_400x400.jpg"
-              alt="Tap Logo"
-              width={200}
-              height={200}
-              className={`rounded-full shadow-xl cursor-pointer hover:scale-105 transition-transform duration-200 ${
-                isLoading ? "opacity-50 pointer-events-none" : ""
-              }`}
-              onClick={handleClickTx}
-          />
+      <Image
+        src="/tealogo.jpg"
+        alt="Tap Tea Logo"
+        width={200}
+        height={200}
+     className={`rounded-full shadow-xl cursor-pointer hover:scale-105 transition-transform duration-200 ${
+        isLoading ? "opacity-50 pointer-events-none" : ""
+    }`}
+      onClick={handleClickTx}
+    />
 
             {txHash && (
               <p className="mt-2 text-sm text-green-400">
