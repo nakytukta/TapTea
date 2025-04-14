@@ -166,15 +166,16 @@ export default function ClickToTxDApp() {
       </h1>
 
       <Image
-        src="/tealogo.jpg"
-        alt="Tap Tea Logo"
-        width={200}
-        height={200}
-     className={`rounded-full shadow-xl cursor-pointer hover:scale-105 transition-transform duration-200 ${
-        isLoading ? "opacity-50 pointer-events-none" : ""
-    }`}
-      onClick={handleClickTx}
-    />
+			src="/tealogo.jpg"
+			alt="Tap Logo"
+			width={200}
+			height={200}
+		className={`rounded-full shadow-xl cursor-pointer hover:scale-105 transition-transform duration-200 ${
+			isLoading ? "opacity-50 pointer-events-none" : ""
+			}`}
+		onClick={handleClickTx}
+		/>
+
 
             {txHash && (
               <p className="mt-2 text-sm text-green-400">
