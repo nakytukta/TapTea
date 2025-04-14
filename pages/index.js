@@ -157,7 +157,7 @@ export default function ClickToTxDApp() {
               className="w-[200px] h-[200px] bg-blue-500 hover:bg-blue-600 rounded-full text-white text-2xl font-bold shadow-xl flex items-center justify-center"
               disabled={isLoading}
             >
-              {isLoading ? "..." : "Let’s go"}
+              {isLoading ? "..." : "TAP"}
             </button>
             {txHash && (
               <p className="mt-2 text-sm text-green-400">
