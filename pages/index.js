@@ -1,32 +1,7 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import Image from "next/image";
-
-const contractABI = [
-  {
-    inputs: [],
-    name: "claim",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "user",
-        type: "address",
-      },
-    ],
-    name: "Claimed",
-    type: "event",
-  },
-];
-
-const contractAddress = "0x01D5a11742b5e819a5517A078d8ce4d9B1c06ac2";
-const RPC = "https://tea-sepolia.g.alchemy.com/public";
+import { contractAddress, contractABI } from "../lib/config";
+import { fetchClaimCountToday } from "../lib/claimUtils";
 
 export default function ClickToTxDApp() {
   const [provider, setProvider] = useState(null);
@@ -35,83 +10,45 @@ export default function ClickToTxDApp() {
   const [isLoading, setIsLoading] = useState(false);
   const [txHash, setTxHash] = useState(null);
   const [claimCount, setClaimCount] = useState(0);
+  const [error, setError] = useState(null);
 
-  // ✅ เชื่อม Metamask
   useEffect(() => {
     if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
       const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
       setProvider(web3Provider);
     }
 
-    fetchClaimCountToday();
+    fetchClaimCountToday(setClaimCount, setError);
   }, []);
 
-  // ✅ ฟังก์ชันหา timestamp 7 โมงเช้าเวลาไทย
-  const getStartOfDayTimestamp = () => {
-    const now = new Date();
-    const bangkok = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
-    bangkok.setHours(7, 0, 0, 0);
-    return Math.floor(bangkok.getTime() / 1000);
-  };
-
-  // ✅ อ่านจำนวนคน claim วันนี้จาก on-chain
-  const fetchClaimCountToday = async () => {
-    const rpcProvider = new ethers.providers.JsonRpcProvider(RPC);
-    const contract = new ethers.Contract(contractAddress, contractABI, rpcProvider);
-    const targetTimestamp = getStartOfDayTimestamp();
-    const latestBlock = await rpcProvider.getBlockNumber();
-
-    let fromBlock = latestBlock - 5000; // ตรวจย้อนหลัง ~5000 บล็อก
-    let found = false;
-
-    // ค้นหาบล็อกเริ่มต้นหลังเวลา 7 โมง
-    while (!found && fromBlock < latestBlock) {
-      const block = await rpcProvider.getBlock(fromBlock);
-      if (block.timestamp >= targetTimestamp) {
-        found = true;
-        break;
-      }
-      fromBlock += 50;
-    }
-
-    const logs = await contract.queryFilter("Claimed", fromBlock, "latest");
-    const uniqueAddresses = new Set();
-
-    logs.forEach((log) => {
-      uniqueAddresses.add(log.args.user.toLowerCase());
-    });
-
-    setClaimCount(uniqueAddresses.size);
-  };
-
   const connectWallet = async () => {
-  try {
-    if (!provider) return;
-
-    await provider.send("eth_requestAccounts", []);
-    const signer = provider.getSigner();
-    const address = await signer.getAddress();
-    setSigner(signer);
-    setWalletAddress(address);
-
-    // 🔁 พยายามสลับ chain ไปยัง Tea Sepolia
     try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x27EA" }],
-      });
-    } catch (switchError) {
-      // ถ้า chain ยังไม่มีใน Metamask ให้เพิ่มเข้าไป
-      if (switchError.code === 4902) {
-        await addTeaSepoliaNetwork();
-      } else {
-        console.error("❌ Switch chain error:", switchError);
+      if (!provider) return;
+
+      await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      setSigner(signer);
+      setWalletAddress(address);
+
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x27EA" }],
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          await addTeaSepoliaNetwork();
+        } else {
+          console.error("Switch chain error:", switchError);
+          setError("ไม่สามารถสลับ network ได้ กรุณาลองใหม่");
+        }
       }
+    } catch (err) {
+      console.error("Wallet connection error:", err);
+      setError("ไม่สามารถเชื่อมต่อ wallet ได้");
     }
-  } catch (err) {
-    console.error("Wallet connection error:", err);
-  }
-};
+  };
 
   const addTeaSepoliaNetwork = async () => {
     try {
@@ -131,25 +68,25 @@ export default function ClickToTxDApp() {
           },
         ],
       });
-      console.log("✅ Tea Sepolia Testnet added to MetaMask");
     } catch (err) {
-      console.error("❌ Error adding Tea Sepolia Testnet:", err);
+      console.error("Error adding Tea Sepolia Testnet:", err);
+      setError("ไม่สามารถเพิ่ม Tea Sepolia network ได้");
     }
   };
 
   const handleClickTx = async () => {
     if (!signer) return;
     setIsLoading(true);
+    setError(null);
     try {
       const contract = new ethers.Contract(contractAddress, contractABI, signer);
       const tx = await contract.claim();
       await tx.wait();
       setTxHash(tx.hash);
-
-      // Refresh claim count after claim success
-      fetchClaimCountToday();
+      await fetchClaimCountToday(setClaimCount, setError);
     } catch (err) {
       console.error("Transaction error:", err);
+      setError("Transaction ล้มเหลว กรุณาลองใหม่");
     } finally {
       setIsLoading(false);
     }
@@ -164,6 +101,12 @@ export default function ClickToTxDApp() {
       <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-lg">
         Tap Tea
       </h1>
+
+      {error && (
+        <p className="text-red-400 text-sm bg-red-900 bg-opacity-30 px-4 py-2 rounded-lg">
+          {error}
+        </p>
+      )}
 
       <div className="flex flex-col items-center space-y-4 mt-6">
         {walletAddress ? (
@@ -217,7 +160,6 @@ export default function ClickToTxDApp() {
         </a>
       </div>
 
-      {/* ✅ มุมขวาล่างนับ claim วันนี้ */}
       <div className="fixed bottom-6 right-6 text-xs text-white bg-black bg-opacity-50 px-3 py-1 rounded-md shadow">
         แสดงจำนวนคน claim วันนี้: {claimCount}
       </div>
